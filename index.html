@@ -34,6 +34,42 @@
             text-align: center;
         }
 
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .nav-tab:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
@@ -467,9 +503,16 @@
         <header>
             <h1>📋 Grievance Tracker</h1>
             <p class="subtitle">Manage and track workplace grievances</p>
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('grievances')">Grievances</button>
+                <button class="nav-tab" onclick="switchTab('library')">Document Library</button>
+                <button class="nav-tab" onclick="switchTab('journal')">Violation Journal</button>
+            </div>
         </header>
 
         <div class="main-content">
+            <!-- Grievances Tab -->
+            <div id="tab-grievances" class="tab-content active">
             <div class="stats">
                 <div class="stat-card stat-total">
                     <h3 id="stat-total">0</h3>
@@ -551,6 +594,54 @@
                     <p>Click "New Grievance" to add your first case</p>
                 </div>
             </div>
+            </div>
+            <!-- End Grievances Tab -->
+
+            <!-- Document Library Tab -->
+            <div id="tab-library" class="tab-content">
+                <h2 style="margin-bottom: 20px; color: #667eea;">📚 Document Library</h2>
+                <p style="margin-bottom: 20px; color: #666;">Store and manage your CBAs, MOUs, policies, and other contract documents.</p>
+
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="openLibraryModal()">+ Add Document</button>
+                    
+                    <div class="filter-group">
+                        <label for="libraryTypeFilter">Type:</label>
+                        <select id="libraryTypeFilter" onchange="filterLibrary()">
+                            <option value="all">All Types</option>
+                            <option value="CBA">CBA</option>
+                            <option value="MOU">MOU</option>
+                            <option value="Policy">Policy</option>
+                            <option value="Handbook">Handbook</option>
+                            <option value="Letter">Letter/Memo</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="librarySearch">Search:</label>
+                        <input type="text" id="librarySearch" placeholder="Search documents..." oninput="filterLibrary()">
+                    </div>
+                </div>
+
+                <div id="libraryContainer"></div>
+            </div>
+            <!-- End Library Tab -->
+
+            <!-- Violation Journal Tab -->
+            <div id="tab-journal" class="tab-content">
+                <h2 style="margin-bottom: 20px; color: #667eea;">📖 Violation Journal</h2>
+                <p style="margin-bottom: 20px; color: #666;">Analyze patterns of contract violations and track resolution outcomes.</p>
+
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="generateJournalReport()">Generate Report</button>
+                    <button class="btn btn-success" onclick="exportJournalToPDF()">Export as PDF</button>
+                </div>
+
+                <div id="journalContent" style="margin-top: 30px;"></div>
+            </div>
+            <!-- End Journal Tab -->
+
         </div>
     </div>
 
@@ -680,13 +771,6 @@
                     </div>
                 </div>
 
-                <div class="template-section" style="background: #fef3c7; border-color: #f59e0b;">
-                    <h3>🤖 Generate Summary & Action Items</h3>
-                    <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Automatically generate a summary and identify action items from this grievance.</p>
-                    <button type="button" class="btn btn-info" onclick="generateSummary()">Generate Summary</button>
-                    <div id="summaryOutput" style="margin-top: 10px; display: none; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;"></div>
-                </div>
-
                 <div class="form-group">
                     <label>Attachments</label>
                     <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
@@ -740,6 +824,66 @@
         </div>
     </div>
 
+    <!-- Library Document Modal -->
+    <div id="libraryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="libraryModalTitle">Add Document to Library</h2>
+                <button class="close-btn" onclick="closeLibraryModal()">&times;</button>
+            </div>
+            <form id="libraryForm" onsubmit="saveLibraryDocument(event)">
+                <input type="hidden" id="libraryEditId">
+                
+                <div class="form-group">
+                    <label for="libraryDocType">Document Type *</label>
+                    <select id="libraryDocType" required>
+                        <option value="CBA">Collective Bargaining Agreement (CBA)</option>
+                        <option value="MOU">Memorandum of Understanding (MOU)</option>
+                        <option value="Policy">District Policy</option>
+                        <option value="Handbook">Employee Handbook</option>
+                        <option value="Letter">Letter/Memo</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="libraryDocName">Document Name *</label>
+                    <input type="text" id="libraryDocName" placeholder="e.g., SEA-SPS CBA 2023-2026" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="libraryDocDate">Effective Date</label>
+                    <input type="date" id="libraryDocDate">
+                </div>
+
+                <div class="form-group">
+                    <label for="libraryDocArticles">Key Articles/Sections</label>
+                    <textarea id="libraryDocArticles" placeholder="List key articles, e.g., Article 6.B - SCDM, Article 8.M - ETL Support"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="libraryDocNotes">Notes</label>
+                    <textarea id="libraryDocNotes" placeholder="Additional information about this document"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Document File *</label>
+                    <div class="file-upload-area" onclick="document.getElementById('libraryDocFile').click()">
+                        <p>📄 Click to upload document</p>
+                        <small>PDF, Word, or text format</small>
+                    </div>
+                    <input type="file" id="libraryDocFile" style="display: none;" onchange="handleLibraryFileSelect(event)">
+                    <div id="libraryFilePreview"></div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn" onclick="closeLibraryModal()" style="background: #e5e7eb; color: #374151;">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let grievances = [];
         let nextId = 1;
@@ -747,6 +891,9 @@
         let currentResolutionFiles = [];
         let templates = [];
         let currentActivityLog = [];
+        let libraryDocuments = [];
+        let libraryNextId = 1;
+        let currentLibraryFile = null;
 
         // Preloaded grievances with activity logs
         const preloadedGrievances = [
@@ -849,7 +996,6 @@
             document.getElementById('fileList').innerHTML = '';
             document.getElementById('resolutionFileList').innerHTML = '';
             document.getElementById('activityLogList').innerHTML = '';
-            document.getElementById('summaryOutput').style.display = 'none';
             
             if (id !== null) {
                 const grievance = grievances.find(g => g.id === id);
@@ -1420,71 +1566,123 @@
             
             // Generate summary
             setTimeout(() => {
-                let summary = `<h4 style="margin-bottom: 10px; color: #667eea;">📊 Grievance Summary</h4>`;
-                summary += `<p style="margin-bottom: 10px;"><strong>Case:</strong> ${issue} filed on behalf of ${grievant}</p>`;
-                summary += `<p style="margin-bottom: 10px;"><strong>Current Status:</strong> ${status} (${priority} Priority)</p>`;
-                
-                // Extract key points
-                summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">🎯 Key Points</h4><ul style="margin-left: 20px;">`;
-                
-                if (description) {
-                    const sentences = description.split('.').filter(s => s.trim().length > 20);
-                    sentences.slice(0, 3).forEach(sentence => {
-                        summary += `<li style="margin-bottom: 5px;">${sentence.trim()}.</li>`;
-                    });
-                }
-                summary += `</ul>`;
-                
-                // Generate action items
-                summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">✅ Action Items</h4><ul style="margin-left: 20px;">`;
-                
-                // Smart action item detection
-                const actionItems = [];
-                
-                if (status === 'Filed') {
-                    actionItems.push('Schedule Level 1 meeting with administration');
-                    actionItems.push('Gather supporting documentation');
-                }
-                else if (status === 'Investigation') {
-                    actionItems.push('Follow up on investigation progress');
-                    actionItems.push('Prepare evidence and witness statements');
-                }
-                else if (status === 'Mediation') {
-                    actionItems.push('Prepare mediation strategy');
-                    actionItems.push('Document all mediation discussions');
-                }
-                else if (status === 'Arbitration') {
-                    actionItems.push('Coordinate with legal counsel');
-                    actionItems.push('Prepare arbitration brief');
-                }
-                else if (status === 'Resolved') {
-                    actionItems.push('Document resolution terms');
-                    actionItems.push('Ensure compliance with agreed remedy');
-                }
-                
-                // Check for remedy-related action items
-                if (notes.toLowerCase().includes('remedy')) {
-                    actionItems.push('Monitor implementation of remedy');
-                }
-                
-                // Check for meeting-related items
-                if (description.toLowerCase().includes('meeting') || notes.toLowerCase().includes('meeting')) {
-                    actionItems.push('Track meeting schedule compliance');
-                }
-                
-                actionItems.forEach(item => {
-                    summary += `<li style="margin-bottom: 5px;">${item}</li>`;
-                });
-                
-                summary += `</ul>`;
-                
-                // Next steps based on priority
-                if (priority === 'High') {
-                    summary += `<div style="margin-top: 15px; padding: 10px; background: #fee2e2; border-left: 3px solid #dc2626; border-radius: 4px;"><strong>⚠️ High Priority:</strong> Immediate action required. Follow up within 48 hours.</div>`;
-                }
-                
-                summaryDiv.innerHTML = summary;
+                summaryDiv.innerHTML = generateSummaryContent(grievant, issue, description, status, notes, priority, null);
             }, 500);
+        }
+
+        function generateSummaryForView(grievanceId) {
+            const grievance = grievances.find(g => g.id === grievanceId);
+            if (!grievance) return;
+            
+            const summaryDiv = document.getElementById(`viewSummaryOutput-${grievanceId}`);
+            summaryDiv.style.display = 'block';
+            summaryDiv.innerHTML = '<p style="color: #666;">🔄 Analyzing grievance data...</p>';
+            
+            // Generate summary
+            setTimeout(() => {
+                summaryDiv.innerHTML = generateSummaryContent(
+                    grievance.grievant,
+                    grievance.issue,
+                    grievance.description,
+                    grievance.status,
+                    grievance.notes,
+                    grievance.priority,
+                    grievance
+                );
+            }, 500);
+        }
+
+        function generateSummaryContent(grievant, issue, description, status, notes, priority, grievance) {
+            let summary = `<h4 style="margin-bottom: 10px; color: #667eea;">📊 Grievance Summary</h4>`;
+            summary += `<p style="margin-bottom: 10px;"><strong>Case:</strong> ${issue} filed on behalf of ${grievant}</p>`;
+            summary += `<p style="margin-bottom: 10px;"><strong>Current Status:</strong> ${status} (${priority} Priority)</p>`;
+            
+            // If resolved, show resolution info
+            if (grievance && grievance.resolutionMethod) {
+                summary += `<p style="margin-bottom: 10px;"><strong>Resolution:</strong> ${grievance.resolutionMethod}`;
+                if (grievance.resolutionDate) {
+                    summary += ` on ${formatDate(grievance.resolutionDate)}`;
+                }
+                summary += `</p>`;
+            }
+            
+            // Extract key points
+            summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">🎯 Key Points</h4><ul style="margin-left: 20px;">`;
+            
+            if (description) {
+                const sentences = description.split('.').filter(s => s.trim().length > 20);
+                sentences.slice(0, 3).forEach(sentence => {
+                    summary += `<li style="margin-bottom: 5px;">${sentence.trim()}.</li>`;
+                });
+            }
+            summary += `</ul>`;
+            
+            // Generate action items
+            summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">✅ Action Items</h4><ul style="margin-left: 20px;">`;
+            
+            // Smart action item detection
+            const actionItems = [];
+            
+            if (status === 'Filed') {
+                actionItems.push('Schedule Level 1 meeting with administration');
+                actionItems.push('Gather supporting documentation');
+            }
+            else if (status === 'Investigation') {
+                actionItems.push('Follow up on investigation progress');
+                actionItems.push('Prepare evidence and witness statements');
+            }
+            else if (status === 'Mediation') {
+                actionItems.push('Prepare mediation strategy');
+                actionItems.push('Document all mediation discussions');
+            }
+            else if (status === 'Arbitration') {
+                actionItems.push('Coordinate with legal counsel');
+                actionItems.push('Prepare arbitration brief');
+            }
+            else if (status === 'Resolved') {
+                actionItems.push('Document resolution terms');
+                actionItems.push('Ensure compliance with agreed remedy');
+                if (grievance && grievance.resolutionSummary) {
+                    actionItems.push('Monitor ongoing compliance');
+                }
+            }
+            
+            // Check for remedy-related action items
+            if (notes.toLowerCase().includes('remedy')) {
+                actionItems.push('Monitor implementation of remedy');
+            }
+            
+            // Check for meeting-related items
+            if (description.toLowerCase().includes('meeting') || notes.toLowerCase().includes('meeting')) {
+                actionItems.push('Track meeting schedule compliance');
+            }
+            
+            // Add timeline tracking
+            if (grievance && grievance.activityLog && grievance.activityLog.length > 2) {
+                const daysSinceFiled = Math.floor((new Date() - new Date(grievance.dateFiled)) / (1000 * 60 * 60 * 24));
+                if (daysSinceFiled > 30 && status !== 'Resolved') {
+                    actionItems.push(`Case is ${daysSinceFiled} days old - consider escalation timeline`);
+                }
+            }
+            
+            actionItems.forEach(item => {
+                summary += `<li style="margin-bottom: 5px;">${item}</li>`;
+            });
+            
+            summary += `</ul>`;
+            
+            // Next steps based on priority
+            if (priority === 'High') {
+                summary += `<div style="margin-top: 15px; padding: 10px; background: #fee2e2; border-left: 3px solid #dc2626; border-radius: 4px;"><strong>⚠️ High Priority:</strong> Immediate action required. Follow up within 48 hours.</div>`;
+            }
+            
+            // Add case analysis if activity log exists
+            if (grievance && grievance.activityLog && grievance.activityLog.length > 1) {
+                const updates = grievance.activityLog.length - 1;
+                summary += `<div style="margin-top: 15px; padding: 10px; background: #e0e7ff; border-left: 3px solid #667eea; border-radius: 4px;"><strong>📈 Case Activity:</strong> ${updates} update${updates > 1 ? 's' : ''} recorded. ${status === 'Resolved' ? 'Case successfully resolved.' : 'Case in progress.'}</div>`;
+            }
+            
+            return summary;
         }
 
         function deleteGrievance(id) {
@@ -1587,6 +1785,13 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div class="template-section" style="background: #fef3c7; border-color: #f59e0b; margin-bottom: 20px;">
+                        <h3>🤖 AI Summary & Action Items</h3>
+                        <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Generate an intelligent summary and identify action items from this grievance.</p>
+                        <button class="btn btn-info" onclick="generateSummaryForView(${id})">Generate Summary</button>
+                        <div id="viewSummaryOutput-${id}" style="margin-top: 10px; display: none; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;"></div>
                     </div>
                     
                     <div style="line-height: 1.6;">
@@ -1994,15 +2199,374 @@ Date: _______________________
         window.onclick = function(event) {
             const grievanceModal = document.getElementById('grievanceModal');
             const templateModal = document.getElementById('templateModal');
+            const libraryModal = document.getElementById('libraryModal');
             if (event.target === grievanceModal) {
                 closeModal();
             }
             if (event.target === templateModal) {
                 closeTemplateModal();
             }
+            if (event.target === libraryModal) {
+                closeLibraryModal();
+            }
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            // Activate the clicked button
+            const buttons = document.querySelectorAll('.nav-tab');
+            buttons.forEach((btn, index) => {
+                if ((index === 0 && tabName === 'grievances') ||
+                    (index === 1 && tabName === 'library') ||
+                    (index === 2 && tabName === 'journal')) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Load content if needed
+            if (tabName === 'library') {
+                renderLibrary();
+            } else if (tabName === 'journal') {
+                generateJournalReport();
+            }
+        }
+
+        // Library Management
+        function loadLibraryData() {
+            const saved = localStorage.getItem('libraryDocuments');
+            if (saved) {
+                libraryDocuments = JSON.parse(saved);
+                libraryNextId = Math.max(...libraryDocuments.map(d => d.id), 0) + 1;
+            }
+        }
+
+        function saveLibraryData() {
+            localStorage.setItem('libraryDocuments', JSON.stringify(libraryDocuments));
+        }
+
+        function openLibraryModal(id = null) {
+            const modal = document.getElementById('libraryModal');
+            const form = document.getElementById('libraryForm');
+            
+            form.reset();
+            currentLibraryFile = null;
+            document.getElementById('libraryFilePreview').innerHTML = '';
+            
+            if (id !== null) {
+                const doc = libraryDocuments.find(d => d.id === id);
+                if (doc) {
+                    document.getElementById('libraryModalTitle').textContent = 'Edit Library Document';
+                    document.getElementById('libraryEditId').value = doc.id;
+                    document.getElementById('libraryDocType').value = doc.type;
+                    document.getElementById('libraryDocName').value = doc.name;
+                    document.getElementById('libraryDocDate').value = doc.effectiveDate || '';
+                    document.getElementById('libraryDocArticles').value = doc.articles || '';
+                    document.getElementById('libraryDocNotes').value = doc.notes || '';
+                    
+                    if (doc.file) {
+                        currentLibraryFile = doc.file;
+                        document.getElementById('libraryFilePreview').innerHTML = `
+                            <div class="file-item">
+                                <span>📄 ${doc.file.name}</span>
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                document.getElementById('libraryModalTitle').textContent = 'Add Document to Library';
+            }
+            
+            modal.classList.add('active');
+        }
+
+        function closeLibraryModal() {
+            document.getElementById('libraryModal').classList.remove('active');
+        }
+
+        function handleLibraryFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentLibraryFile = {
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result
+                    };
+                    document.getElementById('libraryFilePreview').innerHTML = `
+                        <div class="file-item">
+                            <span>📄 ${file.name} (${formatFileSize(file.size)})</span>
+                        </div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function saveLibraryDocument(event) {
+            event.preventDefault();
+            
+            if (!currentLibraryFile) {
+                alert('Please upload a document file');
+                return;
+            }
+            
+            const editId = document.getElementById('libraryEditId').value;
+            
+            const document = {
+                id: editId ? parseInt(editId) : libraryNextId++,
+                type: document.getElementById('libraryDocType').value,
+                name: document.getElementById('libraryDocName').value,
+                effectiveDate: document.getElementById('libraryDocDate').value,
+                articles: document.getElementById('libraryDocArticles').value,
+                notes: document.getElementById('libraryDocNotes').value,
+                file: currentLibraryFile,
+                dateAdded: editId ? libraryDocuments.find(d => d.id === parseInt(editId)).dateAdded : new Date().toISOString().split('T')[0]
+            };
+
+            if (editId) {
+                const index = libraryDocuments.findIndex(d => d.id === parseInt(editId));
+                libraryDocuments[index] = document;
+            } else {
+                libraryDocuments.push(document);
+            }
+
+            saveLibraryData();
+            renderLibrary();
+            closeLibraryModal();
+        }
+
+        function filterLibrary() {
+            const typeFilter = document.getElementById('libraryTypeFilter').value;
+            const searchTerm = document.getElementById('librarySearch').value.toLowerCase();
+
+            const filtered = libraryDocuments.filter(doc => {
+                const matchesType = typeFilter === 'all' || doc.type === typeFilter;
+                const matchesSearch = searchTerm === '' || 
+                    doc.name.toLowerCase().includes(searchTerm) ||
+                    (doc.articles && doc.articles.toLowerCase().includes(searchTerm)) ||
+                    (doc.notes && doc.notes.toLowerCase().includes(searchTerm));
+                
+                return matchesType && matchesSearch;
+            });
+
+            renderLibrary(filtered);
+        }
+
+        function renderLibrary(filteredDocs = null) {
+            const container = document.getElementById('libraryContainer');
+            const displayDocs = filteredDocs || libraryDocuments;
+
+            if (displayDocs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No Documents in Library</h3>
+                        <p>Add your CBA, MOUs, and policies to cross-reference with grievances</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                    ${displayDocs.map(doc => `
+                        <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 20px; background: white;">
+                            <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 10px;">
+                                <span style="background: #667eea; color: white; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">${doc.type}</span>
+                            </div>
+                            <h3 style="color: #333; margin-bottom: 10px; font-size: 16px;">${doc.name}</h3>
+                            ${doc.effectiveDate ? `<p style="color: #666; font-size: 14px; margin-bottom: 8px;">📅 ${formatDate(doc.effectiveDate)}</p>` : ''}
+                            ${doc.articles ? `<p style="color: #666; font-size: 14px; margin-bottom: 8px;">📋 ${doc.articles.split('\\n')[0]}${doc.articles.split('\\n').length > 1 ? '...' : ''}</p>` : ''}
+                            <div style="display: flex; gap: 5px; margin-top: 15px;">
+                                <button class="btn btn-view" onclick="downloadLibraryDoc(${doc.id})">Download</button>
+                                <button class="btn btn-edit" onclick="openLibraryModal(${doc.id})">Edit</button>
+                                <button class="btn btn-danger" onclick="deleteLibraryDoc(${doc.id})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function downloadLibraryDoc(id) {
+            const doc = libraryDocuments.find(d => d.id === id);
+            if (doc && doc.file) {
+                const link = document.createElement('a');
+                link.href = doc.file.data;
+                link.download = doc.file.name;
+                link.click();
+            }
+        }
+
+        function deleteLibraryDoc(id) {
+            if (confirm('Delete this document from library?')) {
+                libraryDocuments = libraryDocuments.filter(d => d.id !== id);
+                saveLibraryData();
+                renderLibrary();
+            }
+        }
+
+        // Violation Journal
+        function generateJournalReport() {
+            const container = document.getElementById('journalContent');
+            
+            if (grievances.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No Grievances to Analyze</h3>
+                        <p>Add grievances to generate violation patterns and analysis</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Analyze grievances by article
+            const violationsByArticle = {};
+            grievances.forEach(g => {
+                const article = g.issue.split('-')[0].trim();
+                if (!violationsByArticle[article]) {
+                    violationsByArticle[article] = {
+                        count: 0,
+                        resolved: 0,
+                        pending: 0,
+                        cases: []
+                    };
+                }
+                violationsByArticle[article].count++;
+                if (g.status === 'Resolved') {
+                    violationsByArticle[article].resolved++;
+                } else {
+                    violationsByArticle[article].pending++;
+                }
+                violationsByArticle[article].cases.push(g);
+            });
+
+            let report = `
+                <div style="background: white; border-radius: 8px; padding: 30px; border: 2px solid #e0e0e0;">
+                    <h2 style="color: #667eea; margin-bottom: 20px;">Contract Violation Analysis</h2>
+                    <p style="color: #666; margin-bottom: 30px;">Generated: ${new Date().toLocaleDateString()}</p>
+            `;
+
+            // Summary stats
+            const totalResolved = grievances.filter(g => g.status === 'Resolved').length;
+            const totalPending = grievances.length - totalResolved;
+            const winRate = grievances.length > 0 ? ((totalResolved / grievances.length) * 100).toFixed(1) : 0;
+
+            report += `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                    <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+                        <div style="font-size: 32px; font-weight: bold; color: #0369a1;">${grievances.length}</div>
+                        <div style="color: #666;">Total Cases</div>
+                    </div>
+                    <div style="background: #d1fae5; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
+                        <div style="font-size: 32px; font-weight: bold; color: #065f46;">${totalResolved}</div>
+                        <div style="color: #666;">Resolved</div>
+                    </div>
+                    <div style="background: #fef3c7; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <div style="font-size: 32px; font-weight: bold; color: #92400e;">${totalPending}</div>
+                        <div style="color: #666;">Pending</div>
+                    </div>
+                    <div style="background: #e0e7ff; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea;">
+                        <div style="font-size: 32px; font-weight: bold; color: #4338ca;">${winRate}%</div>
+                        <div style="color: #666;">Success Rate</div>
+                    </div>
+                </div>
+            `;
+
+            // Violations by article
+            report += `
+                <h3 style="color: #667eea; margin-bottom: 15px; margin-top: 30px;">Violations by Contract Article</h3>
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 20px;">
+            `;
+
+            Object.keys(violationsByArticle).sort((a, b) => violationsByArticle[b].count - violationsByArticle[a].count).forEach(article => {
+                const data = violationsByArticle[article];
+                const percentage = ((data.resolved / data.count) * 100).toFixed(0);
+                
+                report += `
+                    <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e0e0e0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="color: #333; margin: 0;">${article}</h4>
+                            <span style="background: #667eea; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${data.count} case${data.count > 1 ? 's' : ''}</span>
+                        </div>
+                        <div style="display: flex; gap: 20px; margin-bottom: 10px; color: #666; font-size: 14px;">
+                            <span>✅ Resolved: ${data.resolved}</span>
+                            <span>⏳ Pending: ${data.pending}</span>
+                            <span>📊 Success: ${percentage}%</span>
+                        </div>
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer; color: #667eea; font-weight: 600;">View Cases</summary>
+                            <div style="margin-top: 10px; padding-left: 20px;">
+                                ${data.cases.map(c => `
+                                    <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px;">
+                                        <strong>${c.grievant}</strong> - ${formatDate(c.dateFiled)} 
+                                        <span class="status-badge status-${c.status.toLowerCase()}">${c.status}</span>
+                                        ${c.resolutionMethod ? `<br><small style="color: #666;">Resolved via ${c.resolutionMethod}</small>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            });
+
+            report += `</div>`;
+
+            // Patterns and recommendations
+            report += `
+                <h3 style="color: #667eea; margin-bottom: 15px; margin-top: 30px;">Patterns & Recommendations</h3>
+                <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px;">
+                    <ul style="margin-left: 20px; line-height: 1.8;">
+            `;
+
+            // Find most common violation
+            const mostCommon = Object.keys(violationsByArticle).reduce((a, b) => 
+                violationsByArticle[a].count > violationsByArticle[b].count ? a : b
+            );
+            report += `<li><strong>Most Common Violation:</strong> ${mostCommon} (${violationsByArticle[mostCommon].count} cases) - Consider training or policy clarification</li>`;
+
+            // Check for repeat violations
+            const repeatViolations = Object.keys(violationsByArticle).filter(k => violationsByArticle[k].count > 2);
+            if (repeatViolations.length > 0) {
+                report += `<li><strong>Systemic Issues:</strong> ${repeatViolations.length} article(s) with multiple violations - Recommend systemic approach</li>`;
+            }
+
+            // Success rate analysis
+            if (winRate > 80) {
+                report += `<li><strong>Strong Track Record:</strong> ${winRate}% success rate demonstrates effective contract enforcement</li>`;
+            } else if (winRate < 50) {
+                report += `<li><strong>Strategy Review Needed:</strong> ${winRate}% success rate suggests need for case strategy refinement</li>`;
+            }
+
+            report += `
+                    </ul>
+                </div>
+            `;
+
+            report += `</div>`;
+
+            container.innerHTML = report;
+        }
+
+        function exportJournalToPDF() {
+            alert('PDF export functionality would integrate with a PDF library. For now, use your browser\\'s Print > Save as PDF feature.');
+            window.print();
         }
 
         loadData();
+        loadLibraryData();
     </script>
 </body>
 </html>
