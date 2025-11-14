@@ -535,6 +535,7 @@
             <div class="controls">
                 <button class="btn btn-primary" onclick="openModal()">+ New Grievance</button>
                 <button class="btn btn-info" onclick="openTemplateManager()">📄 Manage Templates</button>
+                <button class="btn" onclick="resetToPreloaded()" style="background: #f59e0b; color: white;">🔄 Reset to Sample Data</button>
                 
                 <div class="filter-group">
                     <label for="statusFilter">Status:</label>
@@ -951,20 +952,26 @@
         function loadData() {
             const saved = localStorage.getItem('grievances');
             
-            if (saved) {
-                const parsedGrievances = JSON.parse(saved);
-                // If there are saved grievances, use them
-                if (parsedGrievances.length > 0) {
-                    grievances = parsedGrievances;
-                    nextId = Math.max(...grievances.map(g => g.id), 0) + 1;
-                } else {
-                    // If saved but empty, load preloaded data
+            if (saved && saved !== '[]') {
+                try {
+                    const parsedGrievances = JSON.parse(saved);
+                    if (parsedGrievances.length > 0) {
+                        grievances = parsedGrievances;
+                        nextId = Math.max(...grievances.map(g => g.id), 0) + 1;
+                    } else {
+                        // Empty array, load preloaded
+                        grievances = preloadedGrievances;
+                        nextId = preloadedGrievances.length + 1;
+                        saveData();
+                    }
+                } catch (e) {
+                    // Parse error, load preloaded
                     grievances = preloadedGrievances;
                     nextId = preloadedGrievances.length + 1;
                     saveData();
                 }
             } else {
-                // First time loading - use preloaded data
+                // No saved data or empty, load preloaded
                 grievances = preloadedGrievances;
                 nextId = preloadedGrievances.length + 1;
                 saveData();
@@ -2563,6 +2570,18 @@ Date: _______________________
         function exportJournalToPDF() {
             alert('PDF export functionality would integrate with a PDF library. For now, use your browser\\'s Print > Save as PDF feature.');
             window.print();
+        }
+
+        function resetToPreloaded() {
+            if (confirm('This will reset all grievances to the 3 preloaded sample cases. Your custom data will be lost. Continue?')) {
+                localStorage.removeItem('grievances');
+                grievances = preloadedGrievances;
+                nextId = preloadedGrievances.length + 1;
+                saveData();
+                renderGrievances();
+                updateStats();
+                alert('Data reset to sample grievances!');
+            }
         }
 
         loadData();
