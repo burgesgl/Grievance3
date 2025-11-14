@@ -630,6 +630,46 @@
                     <textarea id="notes" placeholder="Additional notes, follow-ups, or action items..."></textarea>
                 </div>
 
+                <div class="template-section" style="background: #d1fae5; border-color: #10b981;">
+                    <h3>✅ Resolution Details</h3>
+                    <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Document how this grievance was resolved and the outcome.</p>
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="resolutionDate">Resolution Date</label>
+                        <input type="date" id="resolutionDate">
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="resolutionMethod">Resolution Method</label>
+                        <select id="resolutionMethod">
+                            <option value="">Not yet resolved</option>
+                            <option value="Level 1 Agreement">Level 1 Agreement</option>
+                            <option value="Level 2 Agreement">Level 2 Agreement</option>
+                            <option value="Level 3 Agreement">Level 3 Agreement</option>
+                            <option value="Mediation Agreement">Mediation Agreement</option>
+                            <option value="Arbitration Award">Arbitration Award</option>
+                            <option value="Settlement">Settlement</option>
+                            <option value="Withdrawn">Withdrawn</option>
+                            <option value="Denied">Denied</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="resolutionSummary">Resolution Summary</label>
+                        <textarea id="resolutionSummary" placeholder="Describe the outcome, agreed upon remedy, and any follow-up actions required..." style="min-height: 100px;"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Resolution Documents</label>
+                        <div class="file-upload-area" id="resolutionFileUploadArea" onclick="document.getElementById('resolutionFileInput').click()">
+                            <p>📄 Upload resolution documentation</p>
+                            <small>Decision letters, settlement agreements, etc.</small>
+                        </div>
+                        <input type="file" id="resolutionFileInput" multiple style="display: none;" onchange="handleResolutionFileSelect(event)">
+                        <div class="file-list" id="resolutionFileList"></div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Update Log (Track Changes)</label>
                     <div style="margin-bottom: 10px;">
@@ -704,6 +744,7 @@
         let grievances = [];
         let nextId = 1;
         let currentFiles = [];
+        let currentResolutionFiles = [];
         let templates = [];
         let currentActivityLog = [];
 
@@ -803,8 +844,10 @@
             
             form.reset();
             currentFiles = [];
+            currentResolutionFiles = [];
             currentActivityLog = [];
             document.getElementById('fileList').innerHTML = '';
+            document.getElementById('resolutionFileList').innerHTML = '';
             document.getElementById('activityLogList').innerHTML = '';
             document.getElementById('summaryOutput').style.display = 'none';
             
@@ -822,9 +865,19 @@
                     document.getElementById('nextActionDate').value = grievance.nextActionDate || '';
                     document.getElementById('notes').value = grievance.notes || '';
                     
+                    // Resolution fields
+                    document.getElementById('resolutionDate').value = grievance.resolutionDate || '';
+                    document.getElementById('resolutionMethod').value = grievance.resolutionMethod || '';
+                    document.getElementById('resolutionSummary').value = grievance.resolutionSummary || '';
+                    
                     if (grievance.files && grievance.files.length > 0) {
                         currentFiles = [...grievance.files];
                         renderFileList();
+                    }
+                    
+                    if (grievance.resolutionFiles && grievance.resolutionFiles.length > 0) {
+                        currentResolutionFiles = [...grievance.resolutionFiles];
+                        renderResolutionFileList();
                     }
                     
                     if (grievance.activityLog && grievance.activityLog.length > 0) {
@@ -859,6 +912,54 @@
                 };
                 reader.readAsDataURL(file);
             });
+        }
+
+        function handleResolutionFileSelect(event) {
+            const files = Array.from(event.target.files);
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentResolutionFiles.push({
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result
+                    });
+                    renderResolutionFileList();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderResolutionFileList() {
+            const fileList = document.getElementById('resolutionFileList');
+            if (currentResolutionFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+            
+            fileList.innerHTML = currentResolutionFiles.map((file, index) => `
+                <div class="file-item">
+                    <span class="file-item-name">📄 ${file.name} (${formatFileSize(file.size)})</span>
+                    <div class="file-item-actions">
+                        <button type="button" class="btn btn-info" onclick="downloadResolutionFile(${index})">Download</button>
+                        <button type="button" class="btn btn-danger" onclick="removeResolutionFile(${index})">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removeResolutionFile(index) {
+            currentResolutionFiles.splice(index, 1);
+            renderResolutionFileList();
+        }
+
+        function downloadResolutionFile(index) {
+            const file = currentResolutionFiles[index];
+            const link = document.createElement('a');
+            link.href = file.data;
+            link.download = file.name;
+            link.click();
         }
 
         async function handleExtractFile(event) {
@@ -1196,7 +1297,11 @@
                 priority: document.getElementById('priority').value,
                 nextActionDate: document.getElementById('nextActionDate').value,
                 notes: document.getElementById('notes').value,
+                resolutionDate: document.getElementById('resolutionDate').value,
+                resolutionMethod: document.getElementById('resolutionMethod').value,
+                resolutionSummary: document.getElementById('resolutionSummary').value,
                 files: currentFiles,
+                resolutionFiles: currentResolutionFiles,
                 activityLog: currentActivityLog.length > 0 ? currentActivityLog : [
                     { date: new Date().toISOString().split('T')[0], action: 'Grievance created', details: 'Initial filing' }
                 ]
@@ -1231,6 +1336,24 @@
                         date: today,
                         action: `${numAdded} file(s) added`,
                         details: 'Documentation updated'
+                    });
+                }
+                
+                // Track resolution changes
+                if (!oldGrievance.resolutionDate && newGrievance.resolutionDate) {
+                    newGrievance.activityLog.push({
+                        date: today,
+                        action: 'Resolution documented',
+                        details: `Resolved via ${newGrievance.resolutionMethod || 'agreement'}`
+                    });
+                }
+                
+                if (newGrievance.resolutionFiles.length > (oldGrievance.resolutionFiles?.length || 0)) {
+                    const numAdded = newGrievance.resolutionFiles.length - (oldGrievance.resolutionFiles?.length || 0);
+                    newGrievance.activityLog.push({
+                        date: today,
+                        action: `${numAdded} resolution document(s) added`,
+                        details: 'Resolution documentation updated'
                     });
                 }
                 
@@ -1416,6 +1539,32 @@
                 `;
             }
             
+            let resolutionHTML = '';
+            if (grievance.resolutionDate || grievance.resolutionMethod || grievance.resolutionSummary || (grievance.resolutionFiles && grievance.resolutionFiles.length > 0)) {
+                resolutionHTML = `
+                    <div style="background: #d1fae5; border: 2px solid #10b981; border-radius: 8px; padding: 20px; margin-top: 25px;">
+                        <h3 style="margin-bottom: 15px; color: #065f46;">✅ Resolution Details</h3>
+                        ${grievance.resolutionDate ? `<p style="margin-bottom: 10px;"><strong>Resolution Date:</strong> ${formatDate(grievance.resolutionDate)}</p>` : ''}
+                        ${grievance.resolutionMethod ? `<p style="margin-bottom: 10px;"><strong>Method:</strong> ${grievance.resolutionMethod}</p>` : ''}
+                        ${grievance.resolutionSummary ? `
+                            <p style="margin-bottom: 10px;"><strong>Summary:</strong></p>
+                            <div style="background: white; padding: 15px; border-radius: 6px; white-space: pre-line; margin-bottom: 15px;">${grievance.resolutionSummary}</div>
+                        ` : ''}
+                        ${grievance.resolutionFiles && grievance.resolutionFiles.length > 0 ? `
+                            <p style="margin-bottom: 10px;"><strong>Resolution Documents (${grievance.resolutionFiles.length}):</strong></p>
+                            <div>
+                                ${grievance.resolutionFiles.map((file, index) => `
+                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 4px; margin-bottom: 8px;">
+                                        <span>📄 ${file.name} (${formatFileSize(file.size)})</span>
+                                        <button class="btn btn-info" onclick="downloadResolutionFileFromGrievance(${id}, ${index})">Download</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 900px;">
                     <div class="modal-header">
@@ -1458,6 +1607,7 @@
                         ` : ''}
                         
                         ${activityLogHTML}
+                        ${resolutionHTML}
                         ${filesHTML}
                     </div>
                     
@@ -1509,6 +1659,17 @@
             const grievance = grievances.find(g => g.id === grievanceId);
             if (grievance && grievance.files[fileIndex]) {
                 const file = grievance.files[fileIndex];
+                const link = document.createElement('a');
+                link.href = file.data;
+                link.download = file.name;
+                link.click();
+            }
+        }
+
+        function downloadResolutionFileFromGrievance(grievanceId, fileIndex) {
+            const grievance = grievances.find(g => g.id === grievanceId);
+            if (grievance && grievance.resolutionFiles && grievance.resolutionFiles[fileIndex]) {
+                const file = grievance.resolutionFiles[fileIndex];
                 const link = document.createElement('a');
                 link.href = file.data;
                 link.download = file.name;
