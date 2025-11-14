@@ -631,6 +631,23 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Update Log (Track Changes)</label>
+                    <div style="margin-bottom: 10px;">
+                        <button type="button" class="btn btn-info" onclick="addUpdateEntry()">+ Add Update Entry</button>
+                    </div>
+                    <div id="updateLogArea" style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 15px; max-height: 300px; overflow-y: auto;">
+                        <div id="activityLogList"></div>
+                    </div>
+                </div>
+
+                <div class="template-section" style="background: #fef3c7; border-color: #f59e0b;">
+                    <h3>🤖 Generate Summary & Action Items</h3>
+                    <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Automatically generate a summary and identify action items from this grievance.</p>
+                    <button type="button" class="btn btn-info" onclick="generateSummary()">Generate Summary</button>
+                    <div id="summaryOutput" style="margin-top: 10px; display: none; background: white; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0;"></div>
+                </div>
+
+                <div class="form-group">
                     <label>Attachments</label>
                     <div class="file-upload-area" id="fileUploadArea" onclick="document.getElementById('fileInput').click()">
                         <p>📎 Click or drag files here to upload</p>
@@ -688,8 +705,9 @@
         let nextId = 1;
         let currentFiles = [];
         let templates = [];
+        let currentActivityLog = [];
 
-        // Preloaded grievances
+        // Preloaded grievances with activity logs
         const preloadedGrievances = [
             {
                 id: 1,
@@ -701,7 +719,12 @@
                 priority: 'High',
                 nextActionDate: '',
                 notes: 'Filed 12/9/2024. Level 1 meeting held 12/13/2024. Resolved 12/20/2024 - Principal Williams confirmed meeting scheduled upon return to school with SCDM members. Filed by Lee Burgess. Position: SCDM Chair. Worksite: STEM Middle Academy.',
-                files: []
+                files: [],
+                activityLog: [
+                    { date: '2024-12-09', action: 'Grievance created', details: 'Initial filing' },
+                    { date: '2024-12-13', action: 'Status changed to Investigation', details: 'Level 1 meeting held' },
+                    { date: '2024-12-20', action: 'Status changed to Resolved', details: 'Principal Williams confirmed meeting scheduled' }
+                ]
             },
             {
                 id: 2,
@@ -713,7 +736,12 @@
                 priority: 'Medium',
                 nextActionDate: '',
                 notes: 'Remedy Sought: (1) Access to clerical support for seven hours per week to assist with scheduling IEP meetings and contacting families; (2) Time to train any clerical support provided; (3) Clerical support with proper access to SPS databases for scheduling and logging parent communications. Level Three hearing held 10/14/2025. District agreed to provide seven hours per week of clerical support to ETL Adam Ericksen. Decision letter dated 10/15/2025 from Valerie Williams, Chief of Human Resources. Filed by Lee Burgess, STEM SEA Building Representative. Present at hearing: Mike Przybylek (Union Rep), Lee Burgess, Adam Ericksen (ETL), Valerie Williams (HR Chief).',
-                files: []
+                files: [],
+                activityLog: [
+                    { date: '2025-10-12', action: 'Grievance created', details: 'Initial filing' },
+                    { date: '2025-10-14', action: 'Status changed to Investigation', details: 'Level Three hearing held' },
+                    { date: '2025-10-15', action: 'Status changed to Resolved', details: 'District agreed to provide clerical support' }
+                ]
             },
             {
                 id: 3,
@@ -725,7 +753,10 @@
                 priority: 'High',
                 nextActionDate: '',
                 notes: 'Remedy Sought: Immediate scheduling and convening of the first SCDM meeting within five (5) school days of the determination of this grievance. Establish a regular monthly SCDM meeting schedule that meets the minimum requirement of two (2) meetings per month. Filed by Lee Burgess, Association Representative. Incident Date: 11/3/2025. Position: Unit A members. Worksite: STEM Middle School. Step 2.',
-                files: []
+                files: [],
+                activityLog: [
+                    { date: '2025-11-06', action: 'Grievance created', details: 'Initial filing - Step 2' }
+                ]
             }
         ];
 
@@ -772,7 +803,10 @@
             
             form.reset();
             currentFiles = [];
+            currentActivityLog = [];
             document.getElementById('fileList').innerHTML = '';
+            document.getElementById('activityLogList').innerHTML = '';
+            document.getElementById('summaryOutput').style.display = 'none';
             
             if (id !== null) {
                 const grievance = grievances.find(g => g.id === id);
@@ -789,8 +823,13 @@
                     document.getElementById('notes').value = grievance.notes || '';
                     
                     if (grievance.files && grievance.files.length > 0) {
-                        currentFiles = grievance.files;
+                        currentFiles = [...grievance.files];
                         renderFileList();
+                    }
+                    
+                    if (grievance.activityLog && grievance.activityLog.length > 0) {
+                        currentActivityLog = [...grievance.activityLog];
+                        renderActivityLog();
                     }
                 }
             } else {
@@ -1145,7 +1184,9 @@
             event.preventDefault();
             
             const editId = document.getElementById('editId').value;
-            const grievance = {
+            const isEditing = !!editId;
+            
+            const newGrievance = {
                 id: editId ? parseInt(editId) : nextId++,
                 dateFiled: document.getElementById('dateFiled').value,
                 grievant: document.getElementById('grievant').value,
@@ -1155,20 +1196,172 @@
                 priority: document.getElementById('priority').value,
                 nextActionDate: document.getElementById('nextActionDate').value,
                 notes: document.getElementById('notes').value,
-                files: currentFiles
+                files: currentFiles,
+                activityLog: currentActivityLog.length > 0 ? currentActivityLog : [
+                    { date: new Date().toISOString().split('T')[0], action: 'Grievance created', details: 'Initial filing' }
+                ]
             };
 
-            if (editId) {
+            if (isEditing) {
                 const index = grievances.findIndex(g => g.id === parseInt(editId));
-                grievances[index] = grievance;
+                const oldGrievance = grievances[index];
+                
+                // Track changes
+                const today = new Date().toISOString().split('T')[0];
+                
+                if (oldGrievance.status !== newGrievance.status) {
+                    newGrievance.activityLog.push({
+                        date: today,
+                        action: `Status changed from ${oldGrievance.status} to ${newGrievance.status}`,
+                        details: 'Status updated'
+                    });
+                }
+                
+                if (oldGrievance.priority !== newGrievance.priority) {
+                    newGrievance.activityLog.push({
+                        date: today,
+                        action: `Priority changed from ${oldGrievance.priority} to ${newGrievance.priority}`,
+                        details: 'Priority updated'
+                    });
+                }
+                
+                if (newGrievance.files.length > oldGrievance.files.length) {
+                    const numAdded = newGrievance.files.length - oldGrievance.files.length;
+                    newGrievance.activityLog.push({
+                        date: today,
+                        action: `${numAdded} file(s) added`,
+                        details: 'Documentation updated'
+                    });
+                }
+                
+                grievances[index] = newGrievance;
             } else {
-                grievances.push(grievance);
+                grievances.push(newGrievance);
             }
 
             saveData();
             renderGrievances();
             updateStats();
             closeModal();
+        }
+
+        function addUpdateEntry() {
+            const updateText = prompt('Enter update details (e.g., "Met with principal", "Hearing scheduled for 12/15"):');
+            if (updateText && updateText.trim()) {
+                const today = new Date().toISOString().split('T')[0];
+                currentActivityLog.push({
+                    date: today,
+                    action: 'Update added',
+                    details: updateText.trim()
+                });
+                renderActivityLog();
+            }
+        }
+
+        function renderActivityLog() {
+            const logList = document.getElementById('activityLogList');
+            if (currentActivityLog.length === 0) {
+                logList.innerHTML = '<p style="color: #666; font-style: italic;">No updates yet. Changes will be tracked automatically.</p>';
+                return;
+            }
+            
+            logList.innerHTML = currentActivityLog.map((entry, index) => `
+                <div style="padding: 10px; background: white; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #667eea;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #333;">${entry.action}</div>
+                            <div style="color: #666; font-size: 14px; margin-top: 4px;">${entry.details}</div>
+                        </div>
+                        <div style="color: #999; font-size: 12px; white-space: nowrap; margin-left: 10px;">${formatDate(entry.date)}</div>
+                    </div>
+                </div>
+            `).reverse().join('');
+        }
+
+        function generateSummary() {
+            const grievant = document.getElementById('grievant').value;
+            const issue = document.getElementById('issue').value;
+            const description = document.getElementById('description').value;
+            const status = document.getElementById('status').value;
+            const notes = document.getElementById('notes').value;
+            const priority = document.getElementById('priority').value;
+            
+            if (!grievant || !issue) {
+                alert('Please fill in at least the Grievant and Issue fields to generate a summary.');
+                return;
+            }
+            
+            const summaryDiv = document.getElementById('summaryOutput');
+            summaryDiv.style.display = 'block';
+            summaryDiv.innerHTML = '<p style="color: #666;">🔄 Analyzing grievance data...</p>';
+            
+            // Generate summary
+            setTimeout(() => {
+                let summary = `<h4 style="margin-bottom: 10px; color: #667eea;">📊 Grievance Summary</h4>`;
+                summary += `<p style="margin-bottom: 10px;"><strong>Case:</strong> ${issue} filed on behalf of ${grievant}</p>`;
+                summary += `<p style="margin-bottom: 10px;"><strong>Current Status:</strong> ${status} (${priority} Priority)</p>`;
+                
+                // Extract key points
+                summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">🎯 Key Points</h4><ul style="margin-left: 20px;">`;
+                
+                if (description) {
+                    const sentences = description.split('.').filter(s => s.trim().length > 20);
+                    sentences.slice(0, 3).forEach(sentence => {
+                        summary += `<li style="margin-bottom: 5px;">${sentence.trim()}.</li>`;
+                    });
+                }
+                summary += `</ul>`;
+                
+                // Generate action items
+                summary += `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #667eea;">✅ Action Items</h4><ul style="margin-left: 20px;">`;
+                
+                // Smart action item detection
+                const actionItems = [];
+                
+                if (status === 'Filed') {
+                    actionItems.push('Schedule Level 1 meeting with administration');
+                    actionItems.push('Gather supporting documentation');
+                }
+                else if (status === 'Investigation') {
+                    actionItems.push('Follow up on investigation progress');
+                    actionItems.push('Prepare evidence and witness statements');
+                }
+                else if (status === 'Mediation') {
+                    actionItems.push('Prepare mediation strategy');
+                    actionItems.push('Document all mediation discussions');
+                }
+                else if (status === 'Arbitration') {
+                    actionItems.push('Coordinate with legal counsel');
+                    actionItems.push('Prepare arbitration brief');
+                }
+                else if (status === 'Resolved') {
+                    actionItems.push('Document resolution terms');
+                    actionItems.push('Ensure compliance with agreed remedy');
+                }
+                
+                // Check for remedy-related action items
+                if (notes.toLowerCase().includes('remedy')) {
+                    actionItems.push('Monitor implementation of remedy');
+                }
+                
+                // Check for meeting-related items
+                if (description.toLowerCase().includes('meeting') || notes.toLowerCase().includes('meeting')) {
+                    actionItems.push('Track meeting schedule compliance');
+                }
+                
+                actionItems.forEach(item => {
+                    summary += `<li style="margin-bottom: 5px;">${item}</li>`;
+                });
+                
+                summary += `</ul>`;
+                
+                // Next steps based on priority
+                if (priority === 'High') {
+                    summary += `<div style="margin-top: 15px; padding: 10px; background: #fee2e2; border-left: 3px solid #dc2626; border-radius: 4px;"><strong>⚠️ High Priority:</strong> Immediate action required. Follow up within 48 hours.</div>`;
+                }
+                
+                summaryDiv.innerHTML = summary;
+            }, 500);
         }
 
         function deleteGrievance(id) {
